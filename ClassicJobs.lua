@@ -1,5 +1,8 @@
 -- Name:		ClassicJobs.lua
--- Modified:	January 16, 2022
+-- Created:		?
+-- Prev. Modified?/Bulk of work:	January 16, 2022
+-- Modified:	July 23, 2023
+
 -- Author:		FreshFeeling (Kyle / RetroFreshTV)
 -- Description:
 --	Force the characters in Final Fantasy II into job roles.
@@ -52,6 +55,7 @@ shield_level = 0x0059
 spell_experience = {0x005A, 0x005C, 0x005E, 0x0060, 0x0062, 0x0064, 0x0066, 0x0068, 0x006A, 0x006C, 0x006E, 0x0070, 0x0072, 0x0074, 0x0076, 0x0078}
 spell_levels = {0x005B, 0x005D, 0x005F, 0x0061, 0x0063, 0x0065, 0x0067, 0x0069, 0x006B, 0x006D, 0x006F, 0x0071, 0x0073, 0x0075, 0x0077, 0x0079}
 
+-- Store identity bytes for all characters. This allows us to "revert" to an existing state if a character is changed by the game's events.
 character_1_previous_identity = memory.readbyte(characters_base_offset + character_offsets[1] + character_identity)
 character_1_current_identity = memory.readbyte(characters_base_offset + character_offsets[1] + character_identity)
 character_2_previous_identity = memory.readbyte(characters_base_offset + character_offsets[2] + character_identity)
@@ -108,12 +112,13 @@ core_stats_bytes_4 = {characters_base_offset + character_offsets[4] + strength_b
 	characters_base_offset + character_offsets[4] + magic_base}
 
 
--- Force a character to be a knight named Firion.
+-- Force a character to be a knight named Scott. Or Firion.
 function force_character_knight(position)
 	-- Find character's identity byte.
 	idbyte = characters_base_offset + character_offsets[position] + character_identity
 	-- Force it to "0", representing Firion.
-	memory.writebyte(idbyte, 0)
+	-- or "A", representing Scott.
+	memory.writebyte(idbyte, 0x0A)
 
 	-- Get the character's letter bytes.
 	letter1byte = characters_base_offset + character_offsets[position] + name_letter_1
@@ -124,13 +129,20 @@ function force_character_knight(position)
 	letter6byte = characters_base_offset + character_offsets[position] + name_letter_6
 	letter7byte = characters_base_offset + character_offsets[position] + name_letter_7
 	
-	memory.write_u16_le(letter1byte, 0x6582) -- F
-	memory.write_u16_le(letter2byte, 0x8982) -- i
-	memory.write_u16_le(letter3byte, 0x9282) -- r
-	memory.write_u16_le(letter4byte, 0x8982) -- i
-	memory.write_u16_le(letter5byte, 0x8F82) -- o
-	memory.write_u16_le(letter6byte, 0x8E82) -- n
-	memory.write_u16_le(letter7byte, 0x0000) -- [end]
+	-- memory.write_u16_le(letter1byte, 0x6582) -- F
+	-- memory.write_u16_le(letter2byte, 0x8982) -- i
+	-- memory.write_u16_le(letter3byte, 0x9282) -- r
+	-- memory.write_u16_le(letter4byte, 0x8982) -- i
+	-- memory.write_u16_le(letter5byte, 0x8F82) -- o
+	-- memory.write_u16_le(letter6byte, 0x8E82) -- n
+	-- memory.write_u16_le(letter7byte, 0x0000) -- [end]
+
+	memory.write_u16_le(letter1byte, 0x7282) -- S
+	memory.write_u16_le(letter2byte, 0x8382) -- c
+	memory.write_u16_le(letter3byte, 0x8F82) -- o
+	memory.write_u16_le(letter4byte, 0x9482) -- t
+	memory.write_u16_le(letter5byte, 0x9482) -- t
+	memory.write_u16_le(letter6byte, 0x0000) -- [end]
 end
 
 -- Force a character to be a black mage named Maria.
@@ -206,13 +218,15 @@ function force_character_thief(position)
 end
 
 function initialize_all_characters()
-
+	-- Force character identities by slot.
 	force_character_knight(1)
-	force_character_black_mage(2)
+	force_character_thief(2)
 	force_character_white_mage(3)
-	force_character_thief(4)
+	force_character_black_mage(4)
 
+	-- This loop sets all stats to a minimum value, all weapon skills to 1, and all spell slots to 0 for all characters.
 	for i = 1, 4 do
+		-- This part sets base values for stats, based on lowest normal game values.
 		memory.write_u16_le(characters_base_offset + character_offsets[i] + max_hp, 0x0014)
 		memory.write_u16_le(characters_base_offset + character_offsets[i] + max_hp - 0x0002, 0x0014)
 		memory.write_u16_le(characters_base_offset + character_offsets[i] + current_mp, 0x0001)
@@ -223,6 +237,8 @@ function initialize_all_characters()
 		memory.writebyte(characters_base_offset + character_offsets[i] + intelligence_base, 0x03)
 		memory.writebyte(characters_base_offset + character_offsets[i] + spirit_base, 0x03)
 		memory.writebyte(characters_base_offset + character_offsets[i] + magic_base, 0x03)
+
+		-- This part nullifies weapon experience and sets weapon levels to 1.
 		memory.writebyte(characters_base_offset + character_offsets[i] + fist_level, 0x01)
 		memory.writebyte(characters_base_offset + character_offsets[i] + fist_experience, 0x00)
 		memory.writebyte(characters_base_offset + character_offsets[i] + knife_level, 0x01)
@@ -239,12 +255,14 @@ function initialize_all_characters()
 		memory.writebyte(characters_base_offset + character_offsets[i] + bow_experience, 0x00)
 		memory.writebyte(characters_base_offset + character_offsets[i] + shield_level, 0x01)
 		memory.writebyte(characters_base_offset + character_offsets[i] + shield_experience, 0x00)
-
+		
+		-- This part nullifies the spells known, spell levels, and spell experience.
 		for spell = 1, 16 do
 			memory.writebyte(characters_base_offset + character_offsets[i] + spells[spell], 0x00)
 			memory.writebyte(characters_base_offset + character_offsets[i] + spell_experience[spell], 0x00)
 			memory.writebyte(characters_base_offset + character_offsets[i] + spell_levels[spell], 0x01)
 		end
+		
 	end
 
 	-- Set slot 1's initial equipment as a knight.
@@ -253,16 +271,23 @@ function initialize_all_characters()
 	memory.writebyte(0x001F55, 0x70) -- Head leather helmet
 	memory.writebyte(0x001F56, 0x7B) -- Body leather armor
 	memory.writebyte(0x001F57, 0x8E) -- Hands leather glove
-
-	-- Set slot 2's initial equipment as a black mage.
-	memory.writebyte(0x001F53 + character_offsets[2], 0x41) -- Right hand cane
+	
+	-- Set slot 2's initial equipment as a thief.
+	memory.writebyte(0x001F53 + character_offsets[2], 0x3B) -- Right hand dagger
 	memory.writebyte(0x001F54 + character_offsets[2], 0x00) -- Left hand empty
 	memory.writebyte(0x001F55 + character_offsets[2], 0x00) -- Head empty
-	memory.writebyte(0x001F56 + character_offsets[2], 0x7A) -- Body clothes
-	memory.writebyte(0x001F57 + character_offsets[2], 0x00) -- Hands empty
-	memory.writebyte(characters_base_offset + character_offsets[2] + spells[1], 0x01) -- Fire spell
-	memory.writebyte(characters_base_offset + character_offsets[2] + spells[2], 0x02) -- Thunder spell
-	memory.writebyte(characters_base_offset + character_offsets[2] + spells[3], 0x03) -- Blizzard spell
+	memory.writebyte(0x001F56 + character_offsets[2], 0x7B) -- Body leather armor
+	memory.writebyte(0x001F57 + character_offsets[2], 0x8E) -- Hands leather glove
+	
+	-- Set slot 4's initial equipment as a black mage.
+	memory.writebyte(0x001F53 + character_offsets[4], 0x41) -- Right hand cane
+	memory.writebyte(0x001F54 + character_offsets[4], 0x00) -- Left hand empty
+	memory.writebyte(0x001F55 + character_offsets[4], 0x00) -- Head empty
+	memory.writebyte(0x001F56 + character_offsets[4], 0x7A) -- Body clothes
+	memory.writebyte(0x001F57 + character_offsets[4], 0x00) -- Hands empty
+	memory.writebyte(characters_base_offset + character_offsets[4] + spells[1], 0x01) -- Fire spell
+	memory.writebyte(characters_base_offset + character_offsets[4] + spells[2], 0x02) -- Thunder spell
+	memory.writebyte(characters_base_offset + character_offsets[4] + spells[3], 0x03) -- Blizzard spell
 
 	-- Set slot 3's initial equipment as a white mage.
 	memory.writebyte(0x001F53 + character_offsets[3], 0x41) -- Right hand cane
@@ -272,14 +297,7 @@ function initialize_all_characters()
 	memory.writebyte(0x001F57 + character_offsets[3], 0x00) -- Hands empty
 	memory.writebyte(characters_base_offset + character_offsets[3] + spells[1], 0x15) -- Cure spell
 	memory.writebyte(characters_base_offset + character_offsets[3] + spell_levels[1], 0x02) -- Cure spell level	
-	
-	-- Set slot 4's initial equipment as a thief.
-	memory.writebyte(0x001F53 + character_offsets[4], 0x3B) -- Right hand dagger
-	memory.writebyte(0x001F54 + character_offsets[4], 0x00) -- Left hand empty
-	memory.writebyte(0x001F55 + character_offsets[4], 0x00) -- Head empty
-	memory.writebyte(0x001F56 + character_offsets[4], 0x7B) -- Body leather armor
-	memory.writebyte(0x001F57 + character_offsets[4], 0x8E) -- Hands leather glove
-	
+
 end
 
 -- Record an entire character's stats to an array.
@@ -287,11 +305,12 @@ function record_character(position)
 	address = characters_base_offset + character_offsets[position]
 	
 	return memory.read_bytes_as_array(address, 0x80, "EWRAM")
+
 end
 
 -- Overwrite an entire character's stats using an array.
 function overwrite_character(position, character_stats)
-	address = characters_base_offset + character_offsets[position]
+    address = characters_base_offset + character_offsets[position]
 	
 	memory.write_bytes_as_array(address, character_stats, "EWRAM")
 end
@@ -300,17 +319,20 @@ end
 function set_highest_byte(address_to_change, stat_address_array)
 	highest = 0
 	
+	-- Identify the highest value among all characters.
 	for i = 1, 4 do
 		if memory.readbyte(stat_address_array[i]) > highest then
 			highest = memory.readbyte(stat_address_array[i])
 		end
 	end
 
+	-- Max value = 99 / 0x63.
 	if highest >= 0x63 then
 		highest = 0x63
 	end
 
-	if memory.readbyte(address_to_change) <= highest then
+	-- If less than highest, set it to tie highest.
+	if memory.readbyte(address_to_change) < highest then
 		memory.writebyte(address_to_change, highest)
 	end
 end
@@ -319,17 +341,20 @@ end
 function set_highest_word(address_to_change, stat_address_array)
 	highest = 0
 	
+	-- Identify the highest value among all characters.
 	for i = 1, 4 do
-		if memory.read_u16_le(stat_address_array[i]) > highest then
+		if memory.read_u16_le(stat_address_array[i]) > highest then		
 			highest = memory.read_u16_le(stat_address_array[i])
 		end
 	end
 
-	if highest >= 0x270F then
-		highest = 0x270F
+	-- Max value = 9999.
+	if highest >= 9999 then
+		highest = 9999
 	end
 
-	if memory.read_u16_le(address_to_change) <= highest then
+	-- If less than highest, set it to tie highest.
+	if memory.read_u16_le(address_to_change) < highest then
 		memory.write_u16_le(address_to_change, highest)
 	end
 end
@@ -338,12 +363,14 @@ end
 function set_not_highest_byte(address_to_change, stat_address_array)
 	highest = 0
 	
+	-- Identify the highest value among all characters.
 	for i = 1, 4 do
 		if memory.readbyte(stat_address_array[i]) > highest then
 			highest = memory.readbyte(stat_address_array[i])
 		end
 	end
-
+	
+	-- If this character is highest, set the value to highest - 1.
 	if memory.readbyte(address_to_change) >= highest then
 		memory.writebyte(address_to_change, highest - 1)
 	end
@@ -353,16 +380,19 @@ end
 function set_not_highest_word(address_to_change, stat_address_array)
 	highest = 0
 	
+	-- Identify the highest value among all characters.
 	for i = 1, 4 do
 		if memory.read_u16_le(stat_address_array[i]) > highest then
 			highest = memory.read_u16_le(stat_address_array[i])
 		end
 	end
 
-	if highest > 0x270F then
-		highest = 0x270F
+	-- Max value = 9999.
+	if highest > 9999 then
+		highest = 9999
 	end
-
+	
+	-- If this character is highest, set the value to highest - 1.
 	if memory.read_u16_le(address_to_change) >= highest then
 			memory.write_u16_le(address_to_change, highest - 1)
 	end
@@ -372,16 +402,19 @@ end
 function set_not_lowest_byte(address_to_change, stat_address_array)
 	lowest = 0x63
 	
+	-- Identify the lowest value among all characters.
 	for i = 1, 4 do
 		if memory.readbyte(stat_address_array[i]) < lowest then
 			lowest = memory.readbyte(stat_address_array[i])
 		end
 	end
 
+	-- Minimum value is 1.
 	if lowest < 0x01 then
 		lowest = 0x01
 	end
 
+	-- If lowest, set value to lowest + 1.
 	if memory.readbyte(address_to_change) <= lowest then
 			memory.writebyte(address_to_change, lowest + 1)
 	end
@@ -391,16 +424,19 @@ end
 function set_not_lowest_word(address_to_change, stat_address_array)
 	lowest = 0x270F
 	
+	-- Identify the lowest value among all characters.
 	for i = 1, 4 do
 		if memory.read_u16_le(stat_address_array[i]) < lowest then
 			lowest = memory.read_u16_le(stat_address_array[i])
 		end
 	end
 
-	if lowest < 0x0001 then
-		lowest = 0x0001
+	-- Minimum value is 1.
+	if lowest < 1 then
+		lowest = 1
 	end
-	
+
+	-- If lowest, set value to lowest + 1.
 	if memory.read_u16_le(address_to_change) <= lowest then
 			memory.write_u16_le(address_to_change, lowest + 1)
 	end
@@ -410,17 +446,20 @@ end
 function set_lowest_byte(address_to_change, stat_address_array)
 	lowest = 0x63
 	
+	-- Identify the lowest value among all characters.
 	for i = 1, 4 do
 		if memory.readbyte(stat_address_array[i]) < lowest then
 			lowest = memory.readbyte(stat_address_array[i])
 		end
 	end
 
+	-- Minimum value is 1.
 	if lowest < 0x01 then
 		lowest = 0x01
 	end
 
-	if memory.readbyte(address_to_change) <= lowest then
+	-- If not lowest, set value to lowest.
+	if memory.readbyte(address_to_change) < lowest then
 			memory.writebyte(address_to_change, lowest)
 	end
 end
@@ -429,29 +468,34 @@ end
 function set_lowest_word(address_to_change, stat_address_array)
 	lowest = 0x270F
 	
+	-- Identify the lowest value among all characters.
 	for i = 1, 4 do
 		if memory.read_u16_le(stat_address_array[i]) < lowest then
 			lowest = memory.read_u16_le(stat_address_array[i])
 		end
 	end
 
-	if lowest < 0x0001 then
-		lowest = 0x0001
+	-- Minimum value is 1.
+	if lowest < 1 then
+		lowest = 1
 	end
-
-	if memory.read_u16_be(address_to_change) <= lowest then
-		memory.write_u16_be(address_to_change, lowest)
+	
+	-- If not lowest, set value to lowest.
+	if memory.read_u16_le(address_to_change) <= lowest then
+		memory.write_u16_le(address_to_change, lowest)
 	end
 end
 
-
+-- Function to compare a single byte to an array of the current party's values in the stat. Sets the value at the given address equal to at least the average value.
 function set_above_average_byte(address_to_change, stat_address_array)
 	average = 0
 	highest = 0
 	total = 0
 	current_value = memory.readbyte(address_to_change)
 	
+	-- Calculate the total among other characters and identify the highest value.
 	for i = 1, 4 do
+		-- We do not consider this character's own value since that may cause this calculation to roll up like crazy.
 		if address_to_change ~= stat_address_array[i] then
 			total = total + memory.readbyte(stat_address_array[i])
 			if memory.readbyte(stat_address_array[i]) > highest then
@@ -460,8 +504,10 @@ function set_above_average_byte(address_to_change, stat_address_array)
 		end
 	end
 
+	-- Calculate the average value.
 	average = total / 3
 
+	-- If less than average, set it to average +1. If higher than highest, set it to highest - 1.
 	if current_value <= average then
 		current_value = average + 1
 	elseif current_value >= highest then
@@ -471,13 +517,16 @@ function set_above_average_byte(address_to_change, stat_address_array)
 	memory.writebyte(address_to_change, current_value)
 end
 
+-- Function to compare two bytes to an array of the current party's values in the stat. Sets the value at the given address equal to at least the average value.
 function set_above_average_word(address_to_change, stat_address_array)
 	average = 0
 	highest = 0
 	total = 0
 	current_value = memory.read_u16_le(address_to_change)
 
+	-- Calculate the total among other characters and identify the highest value.
 	for i = 1, 4 do
+		-- We do not consider this character's own value since that may cause this calculation to roll up like crazy.
 		if address_to_change ~= stat_address_array[i] then
 			total = total + memory.read_u16_le(stat_address_array[i])
 			if memory.read_u16_le(stat_address_array[i]) > highest then
@@ -486,8 +535,10 @@ function set_above_average_word(address_to_change, stat_address_array)
 		end
 	end
 
+	-- Calculate the average value.
 	average = total / 3
 
+	-- If less than average, set it to average +1. If higher than highest, set it to highest - 1.
 	if current_value <= average then
 		current_value = average + 1
 	elseif current_value >= highest then
@@ -497,14 +548,16 @@ function set_above_average_word(address_to_change, stat_address_array)
 	memory.write_u16_le(address_to_change, current_value)
 end
 
-
+-- Function to compare a single byte to an array of the current party's values in the stat. Sets the value at the given address equal to less than the average value.
 function set_below_average_byte(address_to_change, stat_address_array)
 	lowest = 0x270F
 	average = 0
 	total = 0
 	current_value = memory.readbyte(address_to_change)
 
+	-- Calculate the total among other characters and identify the lowest value.
 	for i = 1, 4 do
+		-- We do not consider this character's own value since that may cause this calculation to roll up like crazy.
 		if address_to_change ~= stat_address_array[i] then
 			total = total + memory.readbyte(stat_address_array[i])
 			if memory.readbyte(stat_address_array[i]) < lowest then
@@ -513,8 +566,10 @@ function set_below_average_byte(address_to_change, stat_address_array)
 		end
 	end
 
+	-- Calculate the average value.
 	average = total / 3
 
+	-- If above average, set it to average - 1. If lower than lowest, set it to lowest + 1.
 	if current_value >= average then
 		current_value = average - 1
 	elseif current_value <= lowest then
@@ -524,13 +579,16 @@ function set_below_average_byte(address_to_change, stat_address_array)
 	memory.writebyte(address_to_change, current_value)
 end
 
+-- Function to compare two bytes to an array of the current party's values in the stat. Sets the value at the given address equal to less than the average value.
 function set_below_average_word(address_to_change, stat_address_array)
 	lowest = 0x270F
 	average = 0
 	total = 0
 	current_value = memory.read_u16_le(address_to_change)
 
+	-- Calculate the total among other characters and identify the lowest value.
 	for i = 1, 4 do
+		-- We do not consider this character's own value since that may cause this calculation to roll up like crazy.
 		if address_to_change ~= stat_address_array[i] then
 			total = total + memory.read_u16_le(stat_address_array[i])
 			if memory.read_u16_le(stat_address_array[i]) < lowest then
@@ -539,8 +597,10 @@ function set_below_average_word(address_to_change, stat_address_array)
 		end
 	end
 
+	-- Calculate the average value.
 	average = total / 3
 
+	-- If above average, set it to average - 1. If lower than lowest, set it to lowest + 1.
 	if current_value >= average then
 		current_value = average - 1
 	elseif current_value <= lowest then
@@ -550,26 +610,29 @@ function set_below_average_word(address_to_change, stat_address_array)
 	memory.write_u16_le(address_to_change, current_value)
 end
 
-
+-- Function to force a byte to at least a minimum value.
 function set_minimum_byte(address_to_change, minimum_value)
 	if memory.readbyte(address_to_change) < minimum_value then
 		memory.writebyte(address_to_change, minimum_value)
 	end
 end
 
+-- Function to force a two-byte value to at least a minimum value.
 function set_minimum_word(address_to_change, minimum_value)
 	if memory.read_u16_le(address_to_change) < minimum_value then
 		memory.write_u16_le(address_to_change, minimum_value)
 	end
 end
 
+-- Function to force a byte to at cap at a maximum value.
 function set_maximum_byte(address_to_change, maximum_value)
 	if memory.readbyte(address_to_change) > maximum_value then
 		memory.writebyte(address_to_change, maximum_value)
 	end
 end
 
-function set_minimum_word(address_to_change, maximum_value)
+-- Function to force a two-byte value to at cap at a maximum value.
+function set_maximum_word(address_to_change, maximum_value)
 	if memory.read_u16_le(address_to_change) > maximum_value then
 		memory.write_u16_le(address_to_change, maximum_value)
 	end
@@ -580,202 +643,217 @@ while true do
 
 	memory.usememorydomain("EWRAM")
 
-	--initialize_all_characters()
+	-- Uncomment this line for the first run of the script to force initial identities, equips and base stats.
+	-- If I were really smart, this would be a separate one-time script. But I'm not.
+    -- initialize_all_characters()
 
-	-- Get all characters' current identities.
-	-- We're doing this to detect changes, and if a character's identity changes we have to replace them with their assigned class/character.
-	character_1_current_identity = memory.readbyte(characters_base_offset + character_offsets[1] + character_identity)
-	character_2_current_identity = memory.readbyte(characters_base_offset + character_offsets[2] + character_identity)
-	character_3_current_identity = memory.readbyte(characters_base_offset + character_offsets[3] + character_identity)
-	character_4_current_identity = memory.readbyte(characters_base_offset + character_offsets[4] + character_identity)
+	-- An arbitrary pause in how often identity checks are done to ease processing.
+	-- Really, even if this only happened every 5 seconds (300 frames) it would probably be fine and almost unnoticeable.
+	-- Try to ensure it doesn't share a low GCD with the next segment. Maybe make it a prime between 50 and 250 or something.
+	if emu.framecount() % 173 == 0 then
 
-	-- Check if character 1 changed.
-	if character_1_current_identity ~= character_1_previous_identity then
-		-- If character 1 changed, make them a knight and overwrite their stats.
-		force_character_knight(1)
-		overwrite_character(1, character_1_stats)
-		character_1_previous_identity = character_1_current_identity
-	else
-		-- If character 1 has not changed, make a copy of them to be used if they change later.
-		character_1_stats = record_character(1)
+		-- Get all characters' current identities.
+		-- We're doing this to detect changes, and if a character's identity changes we have to replace them with their assigned class/character.
+		character_1_current_identity = memory.readbyte(characters_base_offset + character_offsets[1] + character_identity)
+		character_2_current_identity = memory.readbyte(characters_base_offset + character_offsets[2] + character_identity)
+		character_3_current_identity = memory.readbyte(characters_base_offset + character_offsets[3] + character_identity)
+		character_4_current_identity = memory.readbyte(characters_base_offset + character_offsets[4] + character_identity)
+
+    	-- Check if character 1 changed.
+		if character_1_current_identity ~= character_1_previous_identity then
+			-- If character 1 changed, make them a knight and overwrite their stats.
+			force_character_knight(1)
+			overwrite_character(1, character_1_stats)
+			character_1_previous_identity = character_1_current_identity
+		else
+			-- If character 1 has not changed, make a copy of them to be used if they change later.
+			character_1_stats = record_character(1)
+		end
+
+		-- Check if character 2 changed.
+		if character_2_current_identity ~= character_2_previous_identity then
+			-- If character 2 changed, make them a knight and overwrite their stats.
+			force_character_black_mage(2)
+			overwrite_character(2, character_2_stats)
+			character_2_previous_identity = character_2_current_identity
+		else
+			-- If character 2 has not changed, make a copy of them to be used if they change later.
+			character_2_stats = record_character(2)
+		end
+
+		-- Check if character 3 changed.
+		if character_3_current_identity ~= character_3_previous_identity then
+			-- If character 3 changed, make them a knight and overwrite their stats.
+			force_character_white_mage(3)
+			overwrite_character(3, character_3_stats)
+			character_3_previous_identity = character_3_current_identity
+		else
+			-- If character 3 has not changed, make a copy of them to be used if they change later.
+			character_3_stats = record_character(3)
+		end
+
+		-- Check if character 4 changed.
+		if character_4_current_identity ~= character_4_previous_identity then
+			-- If character 4 changed, make them a knight and overwrite their stats.
+			force_character_thief(4)
+			overwrite_character(4, character_4_stats)
+			character_4_previous_identity = character_4_current_identity
+		else
+			-- If character 4 has not changed, make a copy of them to be used if they change later.
+			character_4_stats = record_character(4)
+		end
 	end
 
-	-- Check if character 2 changed.
-	if character_2_current_identity ~= character_2_previous_identity then
-		-- If character 2 changed, make them a knight and overwrite their stats.
-		force_character_black_mage(2)
-		overwrite_character(2, character_2_stats)
-		character_2_previous_identity = character_2_current_identity
-	else
-		-- If character 2 has not changed, make a copy of them to be used if they change later.
-		character_2_stats = record_character(2)
+	-- An arbitrary pause in how often stats forces are done to ease processing.
+	-- This should probably be under 2 seconds (120 frames) to ensure stats are balanced between two fights on neighbouring tiles.
+	if emu.framecount() % 60 == 0 then
+
+		-- Force Knight stats!
+		-- Max HP highest, min 100.
+		set_highest_word(characters_base_offset + character_offsets[1] + character_identity + max_hp, max_hp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[1] + character_identity + max_hp, 0x0064)
+		-- Max MP below average, min 1.
+		set_below_average_word(characters_base_offset + character_offsets[1] + character_identity + max_mp, max_mp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[1] + character_identity + max_mp, 0x0001)
+		-- Strength highest, min 15, max 99.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, 0x63)
+		set_highest_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, strength_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, 0x0F)
+		-- Spirit middle, min 9, max 80.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, 0x50)
+		set_not_highest_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, spirit_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, spirit_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, 0x09)
+		-- Intelligence lowest, min 3, max 60.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, 0x3C)
+		set_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, intelligence_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, 0x03)
+		-- Stamina highest, min 12, max 90.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, 0x5A)
+		set_highest_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, stamina_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, 0x0C)
+		-- Agility lowest, min 6, max 70.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, 0x46)
+		set_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, agility_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, 0x06)
+		-- Magic middle, min 3, max 60.
+		set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, 0x3C)
+		set_not_highest_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, magic_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, magic_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, 0x03)
+		-- Sword level min 3.
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + sword_level, 0x03)
+		-- Shield level min 2.
+		set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + shield_level, 0x02)
+
+		-- Force Black Mage stats!
+		-- Max HP lowest, min 20.
+		set_lowest_word(characters_base_offset + character_offsets[4] + character_identity + max_hp, max_hp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[4] + character_identity + max_hp, 0x0014)
+		-- Max MP highest, min 40.
+		set_maximum_word(characters_base_offset + character_offsets[4] + character_identity + max_mp, 0x03E7)
+		set_highest_word(characters_base_offset + character_offsets[4] + character_identity + max_mp, max_mp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[4] + character_identity + max_mp, 0x0028)
+		-- Strength lowest, min 3, max 60.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, 0x3C)
+		set_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, strength_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, 0x03)
+		-- Spirit middle, min 6, max 70.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, 0x46)
+		set_not_highest_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, spirit_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, spirit_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, 0x06)
+		-- Intelligence highest, min 15, max 99.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, 0x63)
+		set_highest_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, intelligence_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, 0x0F)
+		-- Stamina lowest, min 3, max 60.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, 0x3C)
+		set_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, stamina_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, 0x03)
+		-- Agility middle, min 9, max 80.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, 0x50)
+		set_not_highest_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, agility_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, agility_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, 0x09)
+		-- Magic highest, min 15, max 99.
+		set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + magic_base, 0x63)
+		set_highest_byte(characters_base_offset + character_offsets[4] + character_identity + magic_base, magic_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + magic_base, 0x0F)
+		
+		-- Force White Mage stats!
+		-- Max HP middle, min 25.
+		set_not_highest_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, max_hp_bytes)
+		set_not_lowest_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, max_hp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, 0x0019)
+		-- Max MP above average, min 40.
+		set_above_average_word(characters_base_offset + character_offsets[3] + character_identity + max_mp, max_mp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[3] + character_identity + max_mp, 0x0028)
+		-- Strength below average, min 6, max 70.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, 0x46)
+		set_below_average_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, strength_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, 0x06)
+		-- Spirit highest, min 15, max 99.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, 0x63)
+		set_highest_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, spirit_bytes)	
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, 0x0F)
+		-- Intelligence middle, min 12, max 90.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, 0x5A)
+		set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, intelligence_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, intelligence_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, 0x0C)
+		-- Stamina middle, min 9, max 80.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, 0x50)
+		set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, stamina_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, stamina_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, 0x09)
+		-- Agility middle, min 9, max 80.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, 0x50)
+		set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, agility_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, agility_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, 0x09)
+		-- Magic above average, min 12, max 90.
+		set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, 0x5A)
+		set_above_average_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, magic_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, 0x0C)
+		
+		-- Force Thief stats!
+		-- Max HP middle, min 35.
+		set_not_highest_word(characters_base_offset + character_offsets[2] + character_identity + max_hp, max_hp_bytes)
+		set_not_lowest_word(characters_base_offset + character_offsets[2] + character_identity + max_hp, max_hp_bytes)
+		set_minimum_word(characters_base_offset + character_offsets[2] + character_identity + max_hp, 0x0023)
+		-- Max MP 0.
+		memory.write_u16_le(characters_base_offset + character_offsets[2] + character_identity + current_mp, 0x0000)
+		memory.write_u16_le(characters_base_offset + character_offsets[2] + character_identity + max_mp, 0x0000)
+		-- Strength middle, min 9, max 80.
+		set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, 0x50)
+		set_not_highest_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, strength_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, strength_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, 0x09)
+		-- Spirit lowest, min 3, max 60.
+		set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, 0x3C)
+		set_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, spirit_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, 0x03)
+		-- Intelligence middle, min 6, max 70.
+		set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, 0x46)
+		set_not_highest_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, intelligence_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, intelligence_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, 0x6)
+		-- Stamina middle, min 6, max 70.
+		set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, 0x46)
+		set_not_highest_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, stamina_bytes)
+		set_not_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, stamina_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, 0x06)
+		-- Agility highest, min 15, max 99.
+		set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, 0x63)
+		set_highest_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, agility_bytes)
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, 0x0F)
+		-- Magic 1.
+		memory.writebyte(characters_base_offset + character_offsets[2] + character_identity + magic_base, 0x01)
+		-- Knife level min 2.
+		set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + knife_level, 0x02)
+
 	end
-
-	-- Check if character 3 changed.
-	if character_3_current_identity ~= character_3_previous_identity then
-		-- If character 3 changed, make them a knight and overwrite their stats.
-		force_character_white_mage(3)
-		overwrite_character(3, character_3_stats)
-		character_3_previous_identity = character_3_current_identity
-	else
-		-- If character 3 has not changed, make a copy of them to be used if they change later.
-		character_3_stats = record_character(3)
-	end
-
-	-- Check if character 4 changed.
-	if character_4_current_identity ~= character_4_previous_identity then
-		-- If character 4 changed, make them a knight and overwrite their stats.
-		force_character_thief(4)
-		overwrite_character(4, character_4_stats)
-		character_4_previous_identity = character_4_current_identity
-	else
-		-- If character 4 has not changed, make a copy of them to be used if they change later.
-		character_4_stats = record_character(4)
-	end
-
-	-- Force Knight stats!
-	-- Max HP highest, min 100.
-	set_minimum_word(characters_base_offset + character_offsets[1] + character_identity + max_hp, 0x6400)
-	set_highest_word(characters_base_offset + character_offsets[1] + character_identity + max_hp, max_hp_bytes)
-	-- Max MP below average, min 1.
-	set_minimum_word(characters_base_offset + character_offsets[1] + character_identity + max_mp, 0x0100)
-	set_below_average_word(characters_base_offset + character_offsets[1] + character_identity + max_mp, max_mp_bytes)
-	-- Strength highest, min 15, max 99.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, 0x0F)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, 0x63)
-	set_highest_byte(characters_base_offset + character_offsets[1] + character_identity + strength_base, strength_bytes)
-	-- Spirit middle, min 9, max 80.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, 0x09)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, 0x50)
-	set_not_highest_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, spirit_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + spirit_base, spirit_bytes)
-	-- Intelligence lowest, min 3, max 60.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, 0x03)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, 0x3C)
-	set_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + intelligence_base, intelligence_bytes)
-	-- Stamina highest, min 12, max 90.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, 0x0C)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, 0x5A)
-	set_highest_byte(characters_base_offset + character_offsets[1] + character_identity + stamina_base, stamina_bytes)
-	-- Agility lowest, min 6, max 70.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, 0x06)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, 0x46)
-	set_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + agility_base, agility_bytes)
-	-- Magic middle, min 3, max 60.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, 0x03)
-	set_maximum_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, 0x3C)
-	set_not_highest_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, magic_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[1] + character_identity + magic_base, magic_bytes)
-	-- Sword level min 3.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + sword_level, 0x03)
-	-- Shield level min 2.
-	set_minimum_byte(characters_base_offset + character_offsets[1] + character_identity + shield_level, 0x02)
-
-	-- Force Black Mage stats!
-	-- Max HP lowest, min 20.
-	set_minimum_word(characters_base_offset + character_offsets[2] + character_identity + max_hp, 0x1400)
-	set_lowest_word(characters_base_offset + character_offsets[2] + character_identity + max_hp, max_hp_bytes)
-	-- Max MP highest, min 40.
-	set_minimum_word(characters_base_offset + character_offsets[2] + character_identity + max_mp, 0x0028)
-	set_highest_word(characters_base_offset + character_offsets[2] + character_identity + max_mp, max_mp_bytes)
-	-- Strength lowest, min 3, max 60.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, 0x03)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, 0x3C)
-	set_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + strength_base, strength_bytes)
-	-- Spirit middle, min 6, max 70.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, 0x06)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, 0x46)
-	set_not_highest_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, spirit_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + spirit_base, spirit_bytes)
-	-- Intelligence highest, min 15, max 99.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, 0x0F)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, 0x63)
-	set_highest_byte(characters_base_offset + character_offsets[2] + character_identity + intelligence_base, intelligence_bytes)
-	-- Stamina lowest, min 3, max 60.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, 0x03)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, 0x3C)
-	set_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + stamina_base, stamina_bytes)
-	-- Agility middle, min 9, max 80.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, 0x09)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, 0x50)
-	set_not_highest_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, agility_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[2] + character_identity + agility_base, agility_bytes)
-	-- Magic highest, min 15, max 99.
-	set_minimum_byte(characters_base_offset + character_offsets[2] + character_identity + magic_base, 0x0F)
-	set_maximum_byte(characters_base_offset + character_offsets[2] + character_identity + magic_base, 0x63)
-	set_highest_byte(characters_base_offset + character_offsets[2] + character_identity + magic_base, magic_bytes)
-	
-	-- Force White Mage stats!
-	-- Max HP middle, min 25.
-	set_minimum_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, 0x1900)
-	set_not_highest_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, max_hp_bytes)
-	set_not_lowest_word(characters_base_offset + character_offsets[3] + character_identity + max_hp, max_hp_bytes)
-	-- Max MP above average, min 40.
-	set_minimum_word(characters_base_offset + character_offsets[3] + character_identity + max_mp, 0x0028)
-	set_above_average_word(characters_base_offset + character_offsets[3] + character_identity + max_mp, max_mp_bytes)
-	-- Strength below average, min 6, max 70.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, 0x06)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, 0x46)
-	set_below_average_byte(characters_base_offset + character_offsets[3] + character_identity + strength_base, strength_bytes)
-	-- Spirit highest, min 15, max 99.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, 0x0F)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, 0x63)
-	set_highest_byte(characters_base_offset + character_offsets[3] + character_identity + spirit_base, spirit_bytes)	
-	-- Intelligence middle, min 12, max 90.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, 0x12)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, 0x5A)
-	set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, intelligence_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + intelligence_base, intelligence_bytes)
-	-- Stamina middle, min 9, max 80.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, 0x09)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, 0x50)
-	set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, stamina_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + stamina_base, stamina_bytes)
-	-- Agility middle, min 9, max 80.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, 0x09)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, 0x50)
-	set_not_highest_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, agility_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[3] + character_identity + agility_base, agility_bytes)
-	-- Magic above average, min 12, max 90.
-	set_minimum_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, 0x12)
-	set_maximum_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, 0x5A)
-	set_above_average_byte(characters_base_offset + character_offsets[3] + character_identity + magic_base, magic_bytes)
-	
-	-- Force Thief stats!
-	-- Max HP middle, min 35.
-	set_minimum_word(characters_base_offset + character_offsets[4] + character_identity + max_hp, 0x2300)
-	set_not_highest_word(characters_base_offset + character_offsets[4] + character_identity + max_hp, max_hp_bytes)
-	set_not_lowest_word(characters_base_offset + character_offsets[4] + character_identity + max_hp, max_hp_bytes)
-	-- Max MP 0.
-	memory.write_u16_le(characters_base_offset + character_offsets[4] + character_identity + current_mp, 0x0000)
-	memory.write_u16_le(characters_base_offset + character_offsets[4] + character_identity + max_mp, 0x0000)
-	-- Strength middle, min 9, max 80.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, 0x09)
-	set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, 0x50)
-	set_not_highest_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, strength_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + strength_base, strength_bytes)
-	-- Spirit lowest, min 3, max 60.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, 0x03)
-	set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, 0x3C)
-	set_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + spirit_base, spirit_bytes)
-	-- Intelligence middle, min 6, max 70.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, 0x6)
-	set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, 0x46)
-	set_not_highest_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, intelligence_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + intelligence_base, intelligence_bytes)
-	-- Stamina middle, min 6, max 70.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, 0x06)
-	set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, 0x46)
-	set_not_highest_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, stamina_bytes)
-	set_not_lowest_byte(characters_base_offset + character_offsets[4] + character_identity + stamina_base, stamina_bytes)
-	-- Agility highest, min 15, max 99.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, 0x0F)
-	set_maximum_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, 0x63)
-	set_highest_byte(characters_base_offset + character_offsets[4] + character_identity + agility_base, agility_bytes)
-	-- Magic 1.
-	memory.writebyte(characters_base_offset + character_offsets[4] + character_identity + magic_base, 0x01)
-	-- Knife level min 2.
-	set_minimum_byte(characters_base_offset + character_offsets[4] + character_identity + knife_level, 0x02)
 
 	emu.frameadvance();
 end
